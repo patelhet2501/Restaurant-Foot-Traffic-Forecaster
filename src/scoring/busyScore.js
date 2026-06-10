@@ -7,20 +7,25 @@ export function clamp(n, min = 0, max = 10) {
 }
 
 /**
- * Combine the three signals into a single 0–10 busy score.
+ * Combine the signals into a single 0–10 busy score.
  *
- *   final = (eventScore * 0.5) + (timeBaseline * 0.3) + (weatherModifier * 0.2)
+ * Events and time-of-day form the *baseline* demand (both on a 0–10 scale),
+ * and weather acts as a *multiplier* on top:
  *
- * Note: eventScore and timeBaseline are on a 0–10 scale, while weatherModifier
- * is a small 0.5–1.0 multiplier-style value, so weather nudges rather than
- * dominates the result. Result is clamped to 0–10.
+ *   baseline = (eventScore * 0.6) + (timeBaseline * 0.4)   // 0–10
+ *   final    = baseline * weatherModifier                  // weather scales it
+ *
+ * Because weatherModifier ranges 0.5–1.0, heavy rain can roughly halve the
+ * predicted busyness, while clear weather leaves the baseline untouched.
+ * Result is clamped to 0–10.
  */
 export function computeBusyScore({
   eventScore = 0,
   weatherModifier = 1,
   timeBaseline = 0,
 } = {}) {
-  const final = eventScore * 0.5 + timeBaseline * 0.3 + weatherModifier * 0.2
+  const baseline = eventScore * 0.6 + timeBaseline * 0.4
+  const final = baseline * weatherModifier
   return clamp(final, 0, 10)
 }
 
@@ -68,20 +73,38 @@ export function weatherModifierFromConditions(codeOrDescription) {
   return map[key] ?? 1.0
 }
 
-/** Smooth bump that peaks at 1.0 when x === center, falling off by `spread`. */
-function gaussianBump(x, center, spread) {
-  return Math.exp(-((x - center) ** 2) / (2 * spread ** 2))
+/**
+ * Smooth bump that peaks at 1.0 when `hour` equals `center`, accounting for the
+ * 24-hour wrap-around — so a peak centred on midnight still covers 23:00 and
+ * 01:00 rather than treating them as ~23 hours apart.
+ */
+function circularBump(hour, center, spread) {
+  let distance = Math.abs(hour - center)
+  distance = Math.min(distance, 24 - distance) // shortest way around the clock
+  return Math.exp(-(distance * distance) / (2 * spread * spread))
 }
 
 /**
  * Baseline foot traffic from the hour of day, on a 0–10 scale.
- * Peaks around lunch (~12:30) and dinner/late-evening (~20:00),
- * and bottoms out in the small hours (e.g. 3am).
+ *
+ * Weekdays (Mon–Thu): office-driven — a lunch peak (~13:00) and an
+ * after-work/dinner peak (~18:00), quiet overnight.
+ *
+ * Weekends (Fri/Sat/Sun): the same daytime peaks plus a strong late-night
+ * club peak centred on midnight (covering roughly 22:00–02:00).
+ *
+ * Weekday vs weekend is read from the date's day-of-week, so a caller chooses
+ * the pattern simply by passing a date that falls on the day they want to model.
  */
 export function timeBaselineFromLocalTime(date = new Date()) {
   const hour = date.getHours() + date.getMinutes() / 60
-  const lunch = gaussianBump(hour, 12.5, 1.5)
-  const evening = gaussianBump(hour, 20, 2)
-  const baseline = Math.max(lunch, evening) * 10
+  const day = date.getDay() // 0 = Sun … 5 = Fri, 6 = Sat
+  const isWeekend = day === 5 || day === 6 || day === 0
+
+  const lunch = circularBump(hour, 13, 1.5) // midday office lunch
+  const dinner = circularBump(hour, 18, 1.5) // after-work / dinner
+  const club = isWeekend ? circularBump(hour, 0, 2) : 0 // weekend late-night
+
+  const baseline = Math.max(lunch, dinner, club) * 10
   return clamp(baseline, 0, 10)
 }
