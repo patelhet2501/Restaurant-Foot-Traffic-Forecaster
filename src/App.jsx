@@ -1,6 +1,8 @@
+import { useState } from 'react'
+import BusyGauge from './components/BusyGauge.jsx'
+
 function App() {
-  // Dummy placeholder data — real scoring logic comes later.
-  const busyScore = 6
+  const [value, setValue] = useState(6)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
@@ -9,18 +11,25 @@ function App() {
           BusyMeter — Restaurant Foot Traffic Forecaster
         </h1>
 
-        <div className="mt-6">
-          <div className="text-5xl font-extrabold text-indigo-600">
-            {busyScore}/10
-          </div>
-          <p className="mt-1 text-sm uppercase tracking-wide text-slate-400">
-            Busy score
-          </p>
+        <div className="mt-8">
+          <BusyGauge value={value} />
         </div>
 
-        <p className="mt-6 text-slate-600">
-          This is a placeholder while the real logic is wired up.
-        </p>
+        {/* Optional: live slider to preview the needle moving */}
+        <div className="mt-8">
+          <input
+            type="range"
+            min="0"
+            max="10"
+            step="0.5"
+            value={value}
+            onChange={(e) => setValue(Number(e.target.value))}
+            className="w-full accent-indigo-600"
+          />
+          <p className="mt-2 text-xs text-slate-400">
+            Drag to preview the busy score
+          </p>
+        </div>
       </div>
     </div>
   )
