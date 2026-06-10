@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import BusyGauge from './components/BusyGauge.jsx'
+import { RESTAURANTS } from './data/restaurants.js'
 import {
   computeBusyScore,
   estimateEventScore,
@@ -22,10 +23,14 @@ const WEATHER_OPTIONS = [
 ]
 
 function App() {
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(RESTAURANTS[0].id)
   const [weather, setWeather] = useState('clear')
   const [hour, setHour] = useState(12)
   const [useManual, setUseManual] = useState(false)
   const [manualValue, setManualValue] = useState(6)
+
+  const selectedRestaurant =
+    RESTAURANTS.find((r) => r.id === selectedRestaurantId) ?? RESTAURANTS[0]
 
   // --- Derive the score from the mock inputs (all pure functions) ---
   const eventScore = estimateEventScore({ nearbyEvents: NEARBY_EVENTS })
@@ -43,7 +48,29 @@ function App() {
           BusyMeter — Restaurant Foot Traffic Forecaster
         </h1>
 
-        <div className="mt-8">
+        {/* Restaurant selector */}
+        <label className="mt-6 block text-left">
+          <span className="text-sm font-medium text-slate-600">Restaurant</span>
+          <select
+            value={selectedRestaurantId}
+            onChange={(e) => setSelectedRestaurantId(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+          >
+            {RESTAURANTS.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Selected restaurant summary */}
+        <div className="mt-4">
+          <p className="font-semibold text-slate-800">{selectedRestaurant.name}</p>
+          <p className="text-sm text-slate-500">{selectedRestaurant.address}</p>
+        </div>
+
+        <div className="mt-6">
           <BusyGauge value={score} />
         </div>
 
